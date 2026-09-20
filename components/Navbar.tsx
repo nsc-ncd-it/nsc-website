@@ -80,7 +80,7 @@ export default function Navbar() {
             Register
           </Link>
           <a
-            href="https://nsc-ods.infy.click/"
+            href="https://nscods.infy.click/"
             target="_blank"
             rel="noopener noreferrer"
             className="px-4 py-2 rounded-lg bg-cyan-400 text-slate-950 text-[10px] font-bold uppercase tracking-widest hover:bg-cyan-300 transition-all shadow-lg shadow-cyan-400/20 whitespace-nowrap"
@@ -124,7 +124,7 @@ export default function Navbar() {
               Register
             </Link>
             <a
-              href="https://nsc-ods.infy.click/"
+              href="https://nscods.infy.click/"
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setIsOpen(false)}
