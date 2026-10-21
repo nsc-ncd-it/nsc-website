@@ -6,7 +6,7 @@ import Image from 'next/image';
 
 const stats = [
   { label: 'Total Departments', value: '6', icon: Atom },
-  { label: 'Total Sessions Held', value: '6', icon: Calendar },
+  { label: 'Total Sessions Held', value: '20+', icon: Calendar },
   { label: 'Members', value: '500+', icon: Users },
   { label: 'Achievements', value: '25+', icon: Award },
 ];
@@ -72,8 +72,8 @@ export default function Hero() {
 
               <div className="space-y-1 text-left">
                 <div className="text-5xl md:text-7xl font-light text-white font-mono tracking-tighter">
-                  0{stat.value}
-                </div>
+  {stat.value.length === 1 ? `0${stat.value}` : stat.value}
+</div>
 
                 <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">
                   {stat.label}
