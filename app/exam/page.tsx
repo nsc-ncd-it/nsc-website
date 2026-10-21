@@ -37,6 +37,7 @@ type Exam = {
 type Question = {
   id: string;
   position: number;
+  marks: number;
   question_text: string;
   option_a: string;
   option_b: string;
@@ -759,7 +760,7 @@ export default function ExamPage() {
             className="glass border border-slate-800 rounded-3xl p-6 md:p-8"
           >
             <p className="text-sky-500 font-bold text-sm mb-3">
-              Question {index + 1}
+              Question {index + 1} ({q.marks} {q.marks === 1 ? 'mark' : 'marks'})
             </p>
 
             <div className="text-lg md:text-xl leading-relaxed mb-5">

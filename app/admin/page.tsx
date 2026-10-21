@@ -17,6 +17,7 @@ type KeyRow = { correct_option: string };
 type Question = {
   id: string;
   position: number;
+  marks: number;
   question_text: string;
   option_a: string;
   option_b: string;
@@ -86,6 +87,7 @@ export default function AdminPage() {
   const [optC, setOptC] = useState('');
   const [optD, setOptD] = useState('');
   const [correct, setCorrect] = useState('A');
+  const [marks, setMarks] = useState('1');
   const [imageUrl, setImageUrl] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -280,6 +282,13 @@ export default function AdminPage() {
       return;
     }
 
+    const marksValue = parseInt(marks, 10);
+
+    if (!marksValue || marksValue < 1) {
+      flash('Marks must be 1 or more.');
+      return;
+    }
+
     setSaving(true);
 
     const { data, error } = await supabase
@@ -287,6 +296,7 @@ export default function AdminPage() {
       .insert({
         exam_id: selectedExamId,
         position: questions.length + 1,
+        marks: marksValue,
         question_text: qText.trim(),
         option_a: optA.trim(),
         option_b: optB.trim(),
@@ -663,7 +673,7 @@ export default function AdminPage() {
                     <input className={fieldCls} placeholder="Option D" value={optD} onChange={(e) => setOptD(e.target.value)} />
                   </div>
 
-                  <div className="grid md:grid-cols-[200px_1fr] gap-3 mb-5">
+                  <div className="grid md:grid-cols-[200px_160px_1fr] gap-3 mb-5">
                     <select
                       className={fieldCls}
                       value={correct}
@@ -674,6 +684,17 @@ export default function AdminPage() {
                       <option value="C">Correct answer: C</option>
                       <option value="D">Correct answer: D</option>
                     </select>
+
+                    <label className="flex items-center gap-3 text-slate-400 text-sm">
+                      Marks
+                      <input
+                        className={fieldCls}
+                        type="number"
+                        min={1}
+                        value={marks}
+                        onChange={(e) => setMarks(e.target.value)}
+                      />
+                    </label>
 
                     <input
                       className={fieldCls}
@@ -709,7 +730,8 @@ export default function AdminPage() {
 
                 <div>
                   <h2 className="text-xl font-black mb-4">
-                    Questions in this exam ({questions.length})
+                    Questions in this exam ({questions.length}), total marks:{' '}
+                    {questions.reduce((sum, q) => sum + (q.marks || 1), 0)}
                   </h2>
 
                   <div className="space-y-4">
@@ -723,7 +745,7 @@ export default function AdminPage() {
                         >
                           <div className="flex items-start justify-between gap-4 mb-3">
                             <p className="text-sky-500 font-bold text-sm">
-                              Question {i + 1}
+                              Question {i + 1} ({q.marks} {q.marks === 1 ? 'mark' : 'marks'})
                             </p>
 
                             <button className={dangerBtn} onClick={() => deleteQuestion(q)}>
