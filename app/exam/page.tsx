@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import MathText from '../../components/MathText';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 // =========================
 // SETTINGS (you can change these)
@@ -88,6 +89,8 @@ export default function ExamPage() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
   const [form, setForm] = useState({
     name: '',
@@ -126,6 +129,7 @@ export default function ExamPage() {
     if (!s || submittingRef.current) return;
 
     submittingRef.current = true;
+    setSubmitting(true);
 
     const { error: rpcError } = await supabase.rpc('submit_exam', {
       p_result_id: s.resultId,
@@ -134,6 +138,7 @@ export default function ExamPage() {
 
     if (rpcError) {
       submittingRef.current = false;
+      setSubmitting(false);
       setError(
         'Submission failed. Check your internet connection. It will retry automatically.'
       );
@@ -146,6 +151,7 @@ export default function ExamPage() {
 
     sessionRef.current = null;
     setError('');
+    setSubmitting(false);
     leaveFullscreen();
     setStage('submitted');
   }, []);
@@ -400,18 +406,7 @@ export default function ExamPage() {
     }
   };
 
-  const confirmSubmit = () => {
-    const unanswered = questions.length - Object.keys(answers).length;
-
-    const message =
-      unanswered > 0
-        ? `You have ${unanswered} unanswered question(s). Submit anyway?`
-        : 'Submit your answers now? You cannot change them after this.';
-
-    if (window.confirm(message)) {
-      submitExam();
-    }
-  };
+  const confirmSubmit = () => setShowSubmitConfirm(true);
 
   const checkResult = async () => {
     setLookupError('');
@@ -714,9 +709,37 @@ export default function ExamPage() {
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
   const answeredCount = Object.keys(answers).length;
+  const unansweredCount = questions.length - answeredCount;
 
   return (
     <main className="min-h-screen bg-[#05070A] text-white select-none">
+      <ConfirmDialog
+        open={showSubmitConfirm && !submitting}
+        title="Submit your answers?"
+        message={
+          unansweredCount > 0
+            ? `You have ${unansweredCount} unanswered question${
+                unansweredCount === 1 ? '' : 's'
+              }. You cannot change your answers after submitting.`
+            : 'You have answered every question. You cannot change your answers after submitting.'
+        }
+        confirmText="Yes, submit"
+        cancelText="Go back"
+        onConfirm={() => {
+          setShowSubmitConfirm(false);
+          submitExam();
+        }}
+        onCancel={() => setShowSubmitConfirm(false)}
+      />
+
+      {submitting && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <p className="text-xl font-bold text-sky-400 animate-pulse">
+            Submitting your answers...
+          </p>
+        </div>
+      )}
+
       <div className="sticky top-0 z-50 bg-slate-950 border-b border-slate-800 px-4 md:px-6 py-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-lg md:text-2xl font-black truncate">

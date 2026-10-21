@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import MathText from '../../components/MathText';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 type Exam = {
   id: string;
@@ -42,6 +43,14 @@ type ResultRow = {
 
 type Tab = 'exams' | 'questions' | 'results';
 
+type ConfirmState = {
+  title: string;
+  message: string;
+  confirmText: string;
+  danger: boolean;
+  onConfirm: () => Promise<void>;
+} | null;
+
 const fieldCls =
   'w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:border-sky-500';
 
@@ -72,6 +81,19 @@ export default function AdminPage() {
 
   const [tab, setTab] = useState<Tab>('exams');
   const [message, setMessage] = useState('');
+
+  const [confirmState, setConfirmState] = useState<ConfirmState>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+
+  const ask = (state: NonNullable<ConfirmState>) => setConfirmState(state);
+
+  const runConfirm = async () => {
+    if (!confirmState) return;
+    setConfirmBusy(true);
+    await confirmState.onConfirm();
+    setConfirmBusy(false);
+    setConfirmState(null);
+  };
 
   const [exams, setExams] = useState<Exam[]>([]);
   const [selectedExamId, setSelectedExamId] = useState('');
@@ -256,15 +278,17 @@ export default function AdminPage() {
     );
   };
 
-  const deleteExam = async (exam: Exam) => {
-    if (
-      !window.confirm(
-        `Delete "${exam.title}" with all its questions and results? This cannot be undone.`
-      )
-    ) {
-      return;
-    }
+  const deleteExam = (exam: Exam) => {
+    ask({
+      title: 'Delete this exam?',
+      message: `"${exam.title}" will be deleted together with all its questions and results. This cannot be undone.`,
+      confirmText: 'Delete exam',
+      danger: true,
+      onConfirm: () => doDeleteExam(exam),
+    });
+  };
 
+  const doDeleteExam = async (exam: Exam) => {
     await supabase.from('exams').delete().eq('id', exam.id);
     setSelectedExamId('');
     await loadExams();
@@ -337,9 +361,18 @@ export default function AdminPage() {
     flash('Question added.');
   };
 
-  const deleteQuestion = async (q: Question) => {
-    if (!window.confirm('Delete this question?')) return;
+  const deleteQuestion = (q: Question) => {
+    ask({
+      title: 'Delete this question?',
+      message:
+        'This question and its correct answer will be removed from the exam.',
+      confirmText: 'Delete question',
+      danger: true,
+      onConfirm: () => doDeleteQuestion(q),
+    });
+  };
 
+  const doDeleteQuestion = async (q: Question) => {
     await supabase.from('questions').delete().eq('id', q.id);
 
     // keep the numbering tidy
@@ -357,15 +390,17 @@ export default function AdminPage() {
     flash('Question deleted.');
   };
 
-  const deleteResult = async (r: ResultRow) => {
-    if (
-      !window.confirm(
-        `Delete the attempt of ${r.student_name} (${r.membership_id})? They will be able to take the exam again.`
-      )
-    ) {
-      return;
-    }
+  const deleteResult = (r: ResultRow) => {
+    ask({
+      title: 'Delete this attempt?',
+      message: `${r.student_name} (${r.membership_id}) will be able to take the exam again.`,
+      confirmText: 'Delete attempt',
+      danger: true,
+      onConfirm: () => doDeleteResult(r),
+    });
+  };
 
+  const doDeleteResult = async (r: ResultRow) => {
     await supabase.from('results').delete().eq('id', r.id);
     await loadResults(selectedExamId);
     flash('Attempt deleted.');
@@ -524,6 +559,19 @@ export default function AdminPage() {
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmState !== null}
+        title={confirmState?.title ?? ''}
+        message={confirmState?.message ?? ''}
+        confirmText={confirmState?.confirmText}
+        danger={confirmState?.danger}
+        busy={confirmBusy}
+        onConfirm={runConfirm}
+        onCancel={() => {
+          if (!confirmBusy) setConfirmState(null);
+        }}
+      />
 
       {message && (
         <div className="fixed top-20 right-4 z-50 bg-sky-500 text-slate-950 font-bold px-5 py-3 rounded-xl shadow-lg">
