@@ -23,7 +23,7 @@ export default function Footer() {
           Jahidul Islam Akon (IT Vice President)
         </div>
         <div className="text-xs text-sky-400 font-medium whitespace-nowrap">
-          T.I. Sunny
+          Taofiq Islam Sunny (President)
         </div>
       </div>
       
