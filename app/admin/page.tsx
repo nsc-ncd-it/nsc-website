@@ -112,6 +112,7 @@ export default function AdminPage() {
   const [marks, setMarks] = useState('1');
   const [imageUrl, setImageUrl] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // =========================
   // LOGIN STATE
@@ -295,6 +296,42 @@ export default function AdminPage() {
     flash('Exam deleted.');
   };
 
+  const resetForm = () => {
+    setQText('');
+    setOptA('');
+    setOptB('');
+    setOptC('');
+    setOptD('');
+    setImageUrl('');
+    setCorrect('A');
+  };
+
+  const startEdit = (q: Question) => {
+    const right = getCorrect(q);
+
+    setEditingId(q.id);
+    setQText(q.question_text);
+    setOptA(q.option_a);
+    setOptB(q.option_b);
+    setOptC(q.option_c);
+    setOptD(q.option_d);
+    setCorrect(['A', 'B', 'C', 'D'].includes(right) ? right : 'A');
+    setMarks(String(q.marks || 1));
+    setImageUrl(q.image_url ?? '');
+
+    setTimeout(() => {
+      document
+        .getElementById('question-form')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    resetForm();
+    setMarks('1');
+  };
+
   const addQuestion = async () => {
     if (!selectedExamId) {
       flash('Create or select an exam first.');
@@ -313,6 +350,53 @@ export default function AdminPage() {
       return;
     }
 
+    // ----- Editing an existing question -----
+    if (editingId) {
+      setSaving(true);
+
+      const { error: updateError } = await supabase
+        .from('questions')
+        .update({
+          marks: marksValue,
+          question_text: qText.trim(),
+          option_a: optA.trim(),
+          option_b: optB.trim(),
+          option_c: optC.trim(),
+          option_d: optD.trim(),
+          image_url: imageUrl.trim() || null,
+        })
+        .eq('id', editingId);
+
+      if (updateError) {
+        setSaving(false);
+        flash('Could not update the question.');
+        return;
+      }
+
+      const { error: keyUpdateError } = await supabase
+        .from('answer_keys')
+        .upsert(
+          { question_id: editingId, correct_option: correct },
+          { onConflict: 'question_id' }
+        );
+
+      if (keyUpdateError) {
+        setSaving(false);
+        flash('The question was updated, but the correct answer could not be saved. Try again.');
+        return;
+      }
+
+      setEditingId(null);
+      resetForm();
+      setMarks('1');
+      setSaving(false);
+
+      await loadQuestions(selectedExamId);
+      flash('Question updated.');
+      return;
+    }
+
+    // ----- Adding a new question -----
     setSaving(true);
 
     const { data, error } = await supabase
@@ -373,6 +457,8 @@ export default function AdminPage() {
   };
 
   const doDeleteQuestion = async (q: Question) => {
+    if (editingId === q.id) cancelEdit();
+
     await supabase.from('questions').delete().eq('id', q.id);
 
     // keep the numbering tidy
@@ -544,7 +630,10 @@ export default function AdminPage() {
           <select
             className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm max-w-[260px]"
             value={selectedExamId}
-            onChange={(e) => setSelectedExamId(e.target.value)}
+            onChange={(e) => {
+              setSelectedExamId(e.target.value);
+              cancelEdit();
+            }}
           >
             {exams.length === 0 && <option value="">No exams yet</option>}
             {exams.map((e) => (
@@ -700,8 +789,29 @@ export default function AdminPage() {
               <p className="text-slate-400">Create an exam first (Exams tab).</p>
             ) : (
               <>
-                <div className="glass border border-slate-800 rounded-3xl p-6">
-                  <h2 className="text-xl font-black mb-1">Add a question</h2>
+                <div
+                  id="question-form"
+                  className={`glass border rounded-3xl p-6 scroll-mt-24 ${
+                    editingId ? 'border-sky-500' : 'border-slate-800'
+                  }`}
+                >
+                  <h2 className="text-xl font-black mb-1">
+                    {editingId ? 'Edit question' : 'Add a question'}
+                  </h2>
+
+                  {editingId && (
+                    <div className="mb-4 rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-sm text-sky-200">
+                      You are editing an existing question. Change what you need
+                      and press <b>Save changes</b>.
+                      {results.some((r) => r.submitted_at) && (
+                        <span className="block mt-1 text-amber-300">
+                          Some members have already submitted this exam. Their
+                          scores will not change after this edit.
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   <p className="text-slate-400 text-sm mb-5">
                     Exam: {selectedExam.title}. Write equations between dollar
                     signs, for example $x^2 + 5x + 6 = 0$ or $\frac{'{a}{b}'}$.
@@ -771,9 +881,17 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  <button className={primaryBtn} disabled={saving} onClick={addQuestion}>
-                    {saving ? 'Saving...' : 'Add question'}
-                  </button>
+                  <div className="flex flex-wrap gap-3">
+                    <button className={primaryBtn} disabled={saving} onClick={addQuestion}>
+                      {saving ? 'Saving...' : editingId ? 'Save changes' : 'Add question'}
+                    </button>
+
+                    {editingId && (
+                      <button className={ghostBtn} disabled={saving} onClick={cancelEdit}>
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -789,16 +907,25 @@ export default function AdminPage() {
                       return (
                         <div
                           key={q.id}
-                          className="glass border border-slate-800 rounded-3xl p-6"
+                          className={`glass border rounded-3xl p-6 ${
+                            editingId === q.id ? 'border-sky-500' : 'border-slate-800'
+                          }`}
                         >
                           <div className="flex items-start justify-between gap-4 mb-3">
                             <p className="text-sky-500 font-bold text-sm">
                               Question {i + 1} ({q.marks} {q.marks === 1 ? 'mark' : 'marks'})
+                              {editingId === q.id && ' - editing'}
                             </p>
 
-                            <button className={dangerBtn} onClick={() => deleteQuestion(q)}>
-                              Delete
-                            </button>
+                            <div className="flex gap-2">
+                              <button className={ghostBtn} onClick={() => startEdit(q)}>
+                                Edit
+                              </button>
+
+                              <button className={dangerBtn} onClick={() => deleteQuestion(q)}>
+                                Delete
+                              </button>
+                            </div>
                           </div>
 
                           <div className="mb-4">
